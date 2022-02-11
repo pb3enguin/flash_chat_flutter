@@ -6,6 +6,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 final _firestore = FirebaseFirestore.instance;
 late User loggedInUser;
+final ScrollController _controller = ScrollController();
+
+void _scrollDown() {
+  _controller.jumpTo(_controller.position.minScrollExtent);
+}
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -80,12 +85,15 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   TextButton(
                     onPressed: () {
-                      if (loggedInUser != null) {
+                      if (loggedInUser != null && messageText != '') {
                         messageTextController.clear();
                         _firestore.collection('messages').add({
+                          'timestamp': Timestamp.now(),
                           'text': messageText,
                           'sender': loggedInUser.email,
                         });
+                        messageText = '';
+                        _scrollDown();
                       }
                       //Implement send functionality.
                     },
@@ -110,7 +118,10 @@ class MessagesStream extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _firestore.collection('messages').snapshots(),
+      stream: _firestore
+          .collection('messages')
+          .orderBy('timestamp', descending: false)
+          .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasData) {
           final messages = snapshot.data!.docs.reversed;
@@ -127,8 +138,10 @@ class MessagesStream extends StatelessWidget {
             );
             messageBubbles.add(messageBubble);
           }
+
           return Expanded(
             child: ListView(
+              controller: _controller,
               reverse: true,
               padding: const EdgeInsets.symmetric(
                 horizontal: 10.0,
